@@ -1,0 +1,6 @@
+{
+  "name": "ShipFleet Management System - FleetOps Maritime",
+  "description": "Intelligent Shipping Fleet Management & Voyage Monitoring Platform for managing vessels, voyages, cargo, fuel, maintenance, crew, and real-time operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
