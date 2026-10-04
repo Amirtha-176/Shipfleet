@@ -209,74 +209,89 @@ export const CrewPage: React.FC<CrewPageProps> = () => {
         </div>
       </div>
 
-      {/* Crew Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCrew.map((c) => (
-          <div
-            key={c._id}
-            className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3 hover:border-slate-700 transition-all text-xs"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 text-white font-bold text-sm flex items-center justify-center shadow-md">
-                  {c.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">{c.name}</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">
-                    {c.role}
-                  </span>
-                </div>
-              </div>
-
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">
-                {c.status}
-              </span>
-            </div>
-
-            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-1.5 text-[11px] text-slate-300">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Assigned Vessel:</span>
-                <span className="font-semibold text-white">{c.vesselName || 'Shore / Standby'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Certification:</span>
-                <span className="text-cyan-400 font-medium truncate max-w-[170px]">{c.certification}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Contract Expiry:</span>
-                <span className="font-mono text-slate-200">{c.contractExpiry}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Nationality:</span>
-                <span className="text-slate-200">{c.nationality}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-              <span className="truncate">{c.contact}</span>
-
-              {isAdmin && (
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => handleOpenEdit(c)}
-                    className="p-1 rounded text-slate-400 hover:text-blue-400"
-                    title="Edit Crew"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setCrewToDelete(c)}
-                    className="p-1 rounded text-slate-400 hover:text-rose-400"
-                    title="Delete Crew"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
+      {/* Crew Data Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        {filteredCrew.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-xs">
+            No crew members found matching query.
           </div>
-        ))}
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3.5 px-4">Member / Role</th>
+                  <th className="py-3.5 px-4">Assigned Vessel</th>
+                  <th className="py-3.5 px-4">Certification</th>
+                  <th className="py-3.5 px-4">Nationality</th>
+                  <th className="py-3.5 px-4">Contract Expiry</th>
+                  <th className="py-3.5 px-4">Contact</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  {isAdmin && <th className="py-3.5 px-4 text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {filteredCrew.map((c) => (
+                  <tr key={c._id} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-inner flex-shrink-0">
+                          {c.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm">{c.name}</div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                            {c.role}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-200">
+                      {c.vesselName || <span className="text-slate-400 font-normal">Shore / Standby</span>}
+                    </td>
+                    <td className="py-3.5 px-4 text-cyan-300 font-medium">
+                      {c.certification}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-300">
+                      {c.nationality}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-300">
+                      {c.contractExpiry}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-400 truncate max-w-[140px]">
+                      {c.contact}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                        {c.status}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end space-x-1">
+                          <button
+                            onClick={() => handleOpenEdit(c)}
+                            className="p-1 rounded text-slate-400 hover:text-blue-400 transition-colors"
+                            title="Edit Crew"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setCrewToDelete(c)}
+                            className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors"
+                            title="Delete Crew"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add / Edit Crew Modal */}

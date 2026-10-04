@@ -10,11 +10,13 @@ import {
   AlertTriangle,
   X,
   Trash2,
-  Edit2
+  Edit2,
+  Lock,
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { cargoService, voyageService } from '../services/api.ts';
-import { ICargo, IVoyage, CargoStatus } from '../types/client.ts';
+import { cargoService, voyageService, userService } from '../services/api.ts';
+import { ICargo, IVoyage, CargoStatus, IUser } from '../types/client.ts';
 import { useToast } from '../components/Toast.tsx';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 
@@ -23,14 +25,16 @@ interface CargoPageProps {
 }
 
 export const CargoPage: React.FC<CargoPageProps> = () => {
-  const { isAdmin, isOperator, isViewer } = useAuth();
+  const { isAdmin, isOperator, isUser } = useAuth();
   const { showToast } = useToast();
 
   const [cargoList, setCargoList] = useState<ICargo[]>([]);
   const [voyages, setVoyages] = useState<IVoyage[]>([]);
+  const [users, setUsers] = useState<IUser[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [userFilter, setUserFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
 
   // Modal
@@ -58,16 +62,21 @@ export const CargoPage: React.FC<CargoPageProps> = () => {
   const loadCargo = async () => {
     try {
       setIsLoading(true);
-      const [cargoData, voyagesData] = await Promise.all([
+      const [cargoData, voyagesData, usersData] = await Promise.all([
         cargoService.getAll({
           status: statusFilter !== 'All' ? statusFilter : undefined,
           type: typeFilter !== 'All' ? typeFilter : undefined,
-          search: search || undefined
+          search: search || undefined,
+          ...(isAdmin && userFilter !== 'All' ? { userId: userFilter } as any : {})
         }),
-        voyageService.getAll()
+        voyageService.getAll(),
+        isAdmin ? userService.getAll().catch(() => []) : Promise.resolve([])
       ]);
       setCargoList(cargoData);
       setVoyages(voyagesData);
+      if (usersData && usersData.length > 0) {
+        setUsers(usersData);
+      }
     } catch (err) {
       showToast('error', 'Sync Failed', 'Failed to retrieve cargo manifests.');
     } finally {
@@ -77,7 +86,7 @@ export const CargoPage: React.FC<CargoPageProps> = () => {
 
   useEffect(() => {
     loadCargo();
-  }, [statusFilter, typeFilter]);
+  }, [statusFilter, typeFilter, userFilter]);
 
   useEffect(() => {
     const t = setTimeout(loadCargo, 300);
@@ -206,89 +215,123 @@ export const CargoPage: React.FC<CargoPageProps> = () => {
               <option value="Heavy Machinery">Heavy Machinery</option>
             </select>
           </div>
+
+          {isAdmin && users.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <User className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Created By:</span>
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="All">All Users</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Cargo Manifest Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {cargoList.map((c) => {
-          const statusColor =
-            c.status === 'In Transit'
-              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-              : c.status === 'Delivered'
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-              : 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+      {/* Cargo Manifest Data Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        {cargoList.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-xs">
+            No cargo manifests found matching criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3.5 px-4">Manifest / Description</th>
+                  <th className="py-3.5 px-4">Type &amp; Weight</th>
+                  <th className="py-3.5 px-4">Route (Port to Port)</th>
+                  <th className="py-3.5 px-4">Shipper / Consignee</th>
+                  <th className="py-3.5 px-4">Assigned Voyage</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Created By</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {cargoList.map((c) => {
+                  const statusColor =
+                    c.status === 'In Transit'
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                      : c.status === 'Delivered'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30';
 
-          return (
-            <div
-              key={c._id}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3.5 hover:border-slate-700 transition-all text-xs"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono text-cyan-400 font-bold text-sm">{c.cargoId}</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 font-semibold text-[10px]">
-                      {c.cargoType}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${statusColor}`}>
-                      {c.status}
-                    </span>
-                  </div>
-                  <div className="font-bold text-white text-sm mt-1">{c.description}</div>
-                </div>
-
-                <div className="text-right">
-                  <div className="font-black text-white text-base">{c.weightTons.toLocaleString()} MT</div>
-                  {c.containerCount && (
-                    <div className="text-[11px] text-slate-400 font-semibold">{c.containerCount} Containers</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Shippers */}
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Shipper:</span>
-                  <span className="font-semibold text-slate-200">{c.shipper}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Consignee:</span>
-                  <span className="font-semibold text-slate-200">{c.consignee}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-800 pt-1 mt-1 text-[10px]">
-                  <span className="text-slate-400">Routing:</span>
-                  <span className="text-cyan-400 font-medium">
-                    {c.loadingPort} ➔ {c.dischargePort}
-                  </span>
-                </div>
-              </div>
-
-              {/* Voyage attachment & actions */}
-              <div className="flex items-center justify-between pt-1 text-slate-400 text-[11px]">
-                <div>
-                  {c.voyageCode ? (
-                    <span>
-                      Voyage: <strong className="text-white">{c.voyageCode}</strong> ({c.vesselName})
-                    </span>
-                  ) : (
-                    <span className="text-amber-400 font-medium">Unassigned to voyage</span>
-                  )}
-                </div>
-
-                {isAdmin && (
-                  <button
-                    onClick={() => setCargoToDelete(c)}
-                    className="p-1 rounded text-slate-400 hover:text-rose-400"
-                    title="Delete Manifest"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  return (
+                    <tr key={c._id} className="hover:bg-slate-800/50 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-cyan-400 font-bold text-xs">{c.cargoId}</div>
+                        <div className="font-semibold text-white mt-0.5">{c.description}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-white">{c.weightTons.toLocaleString()} MT</div>
+                        <div className="text-[10px] text-slate-400">
+                          {c.cargoType} {c.containerCount ? `• ${c.containerCount} TEU` : ''}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-1 font-medium text-slate-200">
+                          <span>{c.loadingPort}</span>
+                          <span className="text-cyan-400">➔</span>
+                          <span>{c.dischargePort}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="text-slate-200 font-medium">{c.shipper}</div>
+                        <div className="text-[10px] text-slate-400">To: {c.consignee}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {c.voyageCode ? (
+                          <div>
+                            <span className="font-bold text-white">{c.voyageCode}</span>
+                            <div className="text-[10px] text-blue-400 font-medium">{c.vesselName}</div>
+                          </div>
+                        ) : (
+                          <span className="text-amber-400 font-medium text-[11px]">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block ${statusColor}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-200">{c.createdByName || 'Standard User'}</div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate max-w-[130px]">{c.createdByEmail || 'user@shipfleet.com'}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        {isAdmin ? (
+                          <button
+                            onClick={() => setCargoToDelete(c)}
+                            className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors"
+                            title="Delete Manifest (Admin Only)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 inline-flex items-center space-x-1" title="Upload permanent: only admin can delete">
+                            <Lock className="w-3 h-3 text-slate-500" />
+                            <span>Protected</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add Cargo Modal */}

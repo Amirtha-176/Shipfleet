@@ -21,6 +21,7 @@ import { ReportsPage } from './pages/ReportsPage.tsx';
 import { UsersPage } from './pages/UsersPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { ApiDocsPage } from './pages/ApiDocsPage.tsx';
+import { HistoryPage } from './pages/HistoryPage.tsx';
 
 function MainApp() {
   const { user, isLoading, isAdmin } = useAuth();
@@ -33,6 +34,7 @@ function MainApp() {
   // Login Modal (2 Logins: Admin and User)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginModalRole, setLoginModalRole] = useState<'admin' | 'user'>('admin');
+  const [loginModalTab, setLoginModalTab] = useState<'signin' | 'signup'>('signin');
 
   // Handle page transitions
   const handleNavigate = (page: string, param?: string) => {
@@ -40,9 +42,9 @@ function MainApp() {
       setSelectedVesselId(param);
     }
 
-    // Role protection on client side
-    if (page === 'users' && !isAdmin) {
-      showToast('error', 'Access Restricted', 'User administration requires Administrator privileges.');
+    // Role protection on client side (Admin only sections)
+    if ((page === 'users' || page === 'history' || page === 'api-docs') && !isAdmin) {
+      showToast('error', 'Access Restricted', 'This operational area requires Administrator privileges.');
       setActivePage('dashboard');
       return;
     }
@@ -51,8 +53,9 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenLogin = (role: 'admin' | 'user' = 'admin') => {
+  const handleOpenLogin = (role: 'admin' | 'user' = 'admin', tab: 'signin' | 'signup' = 'signin') => {
     setLoginModalRole(role);
+    setLoginModalTab(tab);
     setIsLoginModalOpen(true);
   };
 
@@ -80,6 +83,7 @@ function MainApp() {
           isOpen={isLoginModalOpen}
           onClose={() => setIsLoginModalOpen(false)}
           defaultRole={loginModalRole}
+          initialTab={loginModalTab}
           onSuccess={handleLoginSuccess}
         />
       </>
@@ -117,6 +121,7 @@ function MainApp() {
           {activePage === 'reports' && <ReportsPage onNavigate={handleNavigate} />}
           {activePage === 'users' && <UsersPage onNavigate={handleNavigate} />}
           {activePage === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
+          {activePage === 'history' && <HistoryPage onNavigate={handleNavigate} />}
           {activePage === 'api-docs' && <ApiDocsPage onNavigate={handleNavigate} />}
         </main>
       </div>

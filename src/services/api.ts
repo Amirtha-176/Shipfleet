@@ -261,9 +261,34 @@ export const userService = {
 };
 
 export const auditService = {
-  getAll: async () => {
-    const res = await api.get<{ success: boolean; data: IAuditLog[] }>('/audit-logs');
+  getAll: async (params?: { userId?: string; entity?: string }) => {
+    const res = await api.get<{ success: boolean; data: IAuditLog[] }>('/audit-logs', { params });
     return res.data.data;
+  }
+};
+
+export interface IMongoStatus {
+  connected: boolean;
+  mode: 'MongoDB Atlas / Server' | 'Embedded MongoDB Engine (Local)';
+  uri: string;
+  database: string;
+  collections: Record<string, number>;
+  lastSynced?: string;
+  error?: string;
+}
+
+export const mongodbService = {
+  getStatus: async () => {
+    const res = await api.get<{ success: boolean; data: IMongoStatus }>('/mongodb/status');
+    return res.data.data;
+  },
+  connect: async (uri: string) => {
+    const res = await api.post<{ success: boolean; message: string; data: IMongoStatus }>('/mongodb/connect', { uri });
+    return res.data;
+  },
+  sync: async () => {
+    const res = await api.post<{ success: boolean; message: string; data: IMongoStatus }>('/mongodb/sync');
+    return res.data;
   }
 };
 

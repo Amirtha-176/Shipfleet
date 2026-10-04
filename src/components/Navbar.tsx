@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
-  Code2
+  Code2,
+  History,
+  Database
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useSocket } from '../context/SocketContext.tsx';
@@ -26,7 +28,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
-  const { user, logout, switchUserRoleDemo, isAdmin, isUser } = useAuth();
+  const { user, logout, isAdmin, isUser } = useAuth();
   const { onlineCount, onlineUsers } = useSocket();
   const { showToast } = useToast();
 
@@ -277,45 +279,45 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activePage }) => {
               )}
             </div>
 
-            {/* Direct REST API Docs Button */}
-            <button
-              onClick={() => onNavigate('api-docs')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 ${
-                activePage === 'api-docs'
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm'
-                  : 'bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white border-slate-700/80'
-              }`}
-              title="REST API Documentation & Endpoints Specification"
-            >
-              <Code2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">API Docs</span>
-            </button>
+            {/* Direct REST API Docs Button (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={() => onNavigate('api-docs')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+                  activePage === 'api-docs'
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm'
+                    : 'bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white border-slate-700/80'
+                }`}
+                title="REST API Documentation & Endpoints Specification"
+              >
+                <Code2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">API Docs</span>
+              </button>
+            )}
 
-            {/* Quick Demo Role Switcher (2 Logins: Admin and User) */}
-            <div className="hidden lg:flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700/80 text-xs">
-              <button
-                onClick={() => switchUserRoleDemo('admin')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                  isAdmin
-                    ? 'bg-rose-600 text-white shadow-sm font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Switch to Admin account (full CRUD & User Management)"
-              >
-                Admin
-              </button>
-              <button
-                onClick={() => switchUserRoleDemo('user')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                  !isAdmin
-                    ? 'bg-blue-600 text-white shadow-sm font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Switch to User account (Voyages, Fleet, Cargo, Fuel & Monitoring)"
-              >
-                User
-              </button>
+            {/* MongoDB Live Status Pill */}
+            <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-slate-400 font-medium">MongoDB:</span>
+              <span className="text-emerald-400 font-bold">Active</span>
             </div>
+
+            {/* Direct Histories Button (Admin Only) */}
+            {isAdmin && (
+              <button
+                onClick={() => onNavigate('history')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+                  activePage === 'history'
+                    ? 'bg-blue-600/30 text-blue-300 border-blue-500/50 shadow-sm'
+                    : 'bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white border-slate-700/80'
+                }`}
+                title="Personal and Fleet Activity Histories"
+              >
+                <History className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">Histories</span>
+              </button>
+            )}
 
             {/* Operational Alerts Bell */}
             <div ref={alertRef} className="relative">

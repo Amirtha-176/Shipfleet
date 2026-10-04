@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { db } from './storage.ts';
 import { cache } from './services/cache.ts';
 import { authenticate, requireRole, logAudit, generateToken, AuthRequest } from './middleware/auth.ts';
+import { mongoManager } from './mongo.ts';
 import {
   IUser,
   IVessel,
@@ -565,8 +566,8 @@ router.get('/voyages/:id', authenticate, (req: Request, res: Response): void => 
   });
 });
 
-// Operator and Admin: Create Voyage
-router.post('/voyages', authenticate, requireRole(['admin', 'operator']), (req: AuthRequest, res: Response): void => {
+// User and Admin: Create Voyage
+router.post('/voyages', authenticate, requireRole(['admin', 'user', 'operator']), (req: AuthRequest, res: Response): void => {
   const {
     vesselId,
     originPort,
@@ -716,7 +717,14 @@ router.post('/voyages/:id/assign-cargo', authenticate, requireRole(['admin', 'op
 });
 
 // Admin only: Delete Voyage
-router.delete('/voyages/:id', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
+router.delete('/voyages/:id', authenticate, (req: AuthRequest, res: Response): void => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: 'Deletion Restricted: As a standard user, once ocean voyages are scheduled they cannot be deleted. Please contact an Administrator.'
+    });
+    return;
+  }
   const voyage = db.findById('voyages', req.params.id) as IVoyage | null;
   if (!voyage) {
     res.status(404).json({ success: false, message: 'Voyage not found' });
@@ -1084,13 +1092,21 @@ router.get('/fuel/analytics', authenticate, (req: Request, res: Response): void 
 });
 
 // Admin only: Delete Fuel Record
-router.delete('/fuel/:id', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
-  const rec = db.findById('fuelRecords', req.params.id);
+router.delete('/fuel/:id', authenticate, (req: AuthRequest, res: Response): void => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: 'Deletion Restricted: Once fuel records are submitted, only an Administrator can delete them.'
+    });
+    return;
+  }
+  const rec = db.findById('fuelRecords', req.params.id) as IFuelRecord | null;
   if (!rec) {
     res.status(404).json({ success: false, message: 'Fuel record not found' });
     return;
   }
   db.findByIdAndDelete('fuelRecords', req.params.id);
+  logAudit(req, 'DELETE_FUEL', 'FuelRecord', req.params.id, `Deleted fuel bunkering record for ${rec.vesselName || req.params.id}`);
   res.json({ success: true, message: 'Fuel record deleted' });
 });
 
@@ -1099,8 +1115,16 @@ router.delete('/fuel/:id', authenticate, requireRole(['admin']), (req: AuthReque
 // ----------------------------------------------------
 
 router.get('/maintenance', authenticate, (req: Request, res: Response): void => {
-  const { status, priority, vesselId } = req.query;
+  const user = (req as AuthRequest).user!;
+  const { status, priority, vesselId, userId } = req.query;
   let records = db.find('maintenance');
+
+  // User isolation: non-admin users only view maintenance records they scheduled
+  if (user.role !== 'admin') {
+    records = records.filter((m) => m.createdBy === user._id);
+  } else if (userId && userId !== 'All') {
+    records = records.filter((m) => m.createdBy === String(userId));
+  }
 
   if (status && status !== 'All') {
     records = records.filter((m) => m.status.toLowerCase() === String(status).toLowerCase());
@@ -1117,8 +1141,8 @@ router.get('/maintenance', authenticate, (req: Request, res: Response): void => 
   res.json({ success: true, count: records.length, data: records });
 });
 
-// Admin only: Schedule Maintenance
-router.post('/maintenance', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
+// User and Admin: Schedule Maintenance
+router.post('/maintenance', authenticate, requireRole(['admin', 'user', 'operator']), (req: AuthRequest, res: Response): void => {
   const {
     vesselId,
     maintenanceType,
@@ -1159,7 +1183,10 @@ router.post('/maintenance', authenticate, requireRole(['admin']), (req: AuthRequ
     costUSD: Number(costUSD) || 12000,
     partsUsed: Array.isArray(partsUsed) ? partsUsed : partsUsed ? [partsUsed] : ['Filter Cartridges', 'O-Rings'],
     status: 'Scheduled',
-    notes: notes || ''
+    notes: notes || '',
+    createdBy: req.user?._id,
+    createdByName: req.user?.name,
+    createdByEmail: req.user?.email
   });
 
   // If critical, trigger an alert
@@ -1180,8 +1207,8 @@ router.post('/maintenance', authenticate, requireRole(['admin']), (req: AuthRequ
   res.status(201).json({ success: true, message: 'Maintenance scheduled successfully', data: newMaintenance });
 });
 
-// Admin only: Update Maintenance
-router.put('/maintenance/:id', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
+// Admin and User: Update Maintenance
+router.put('/maintenance/:id', authenticate, requireRole(['admin', 'user', 'operator']), (req: AuthRequest, res: Response): void => {
   const m = db.findById('maintenance', req.params.id) as IMaintenance | null;
   if (!m) {
     res.status(404).json({ success: false, message: 'Maintenance record not found' });
@@ -1202,13 +1229,22 @@ router.put('/maintenance/:id', authenticate, requireRole(['admin']), (req: AuthR
 });
 
 // Admin only: Delete Maintenance
-router.delete('/maintenance/:id', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
+router.delete('/maintenance/:id', authenticate, (req: AuthRequest, res: Response): void => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({
+      success: false,
+      message: 'Deletion Restricted: Once maintenance operational data is logged, only an Administrator can delete it.'
+    });
+    return;
+  }
+
   const m = db.findById('maintenance', req.params.id);
   if (!m) {
     res.status(404).json({ success: false, message: 'Maintenance record not found' });
     return;
   }
   db.findByIdAndDelete('maintenance', req.params.id);
+  logAudit(req, 'DELETE_MAINTENANCE', 'Maintenance', req.params.id, `Deleted maintenance record ${m.maintenanceId || req.params.id}`);
   res.json({ success: true, message: 'Maintenance record deleted' });
 });
 
@@ -1504,13 +1540,77 @@ router.delete('/users/:id', authenticate, requireRole(['admin']), (req: AuthRequ
 });
 
 // ----------------------------------------------------
-// AUDIT LOGS (Admin Only)
+// AUDIT LOGS & ACTION HISTORIES (User & Admin)
 // ----------------------------------------------------
 
-router.get('/audit-logs', authenticate, requireRole(['admin']), (req: Request, res: Response): void => {
-  const logs = db.find('auditLogs');
+router.get('/audit-logs', authenticate, (req: Request, res: Response): void => {
+  const user = (req as AuthRequest).user!;
+  const { userId, entity } = req.query;
+  let logs = db.find('auditLogs');
+
+  // User isolation: non-admin users only view their own action history
+  if (user.role !== 'admin') {
+    logs = logs.filter((l) => l.userId === user._id);
+  } else if (userId && userId !== 'All') {
+    logs = logs.filter((l) => l.userId === String(userId));
+  }
+
+  if (entity && entity !== 'All') {
+    logs = logs.filter((l) => l.entity.toLowerCase() === String(entity).toLowerCase());
+  }
+
   logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  res.json({ success: true, count: logs.length, data: logs.slice(0, 100) });
+  res.json({ success: true, count: logs.length, data: logs });
+});
+
+// ----------------------------------------------------
+// MONGODB DATABASE MANAGEMENT & SYNC APIs
+// ----------------------------------------------------
+
+router.get('/mongodb/status', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const status = await mongoManager.getStatus(db.getCounts());
+    res.json({ success: true, data: status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to query MongoDB status', error: err.message });
+  }
+});
+
+router.post('/mongodb/connect', authenticate, requireRole(['admin']), async (req: AuthRequest, res: Response): Promise<void> => {
+  const { uri } = req.body;
+  if (!uri || typeof uri !== 'string') {
+    res.status(400).json({ success: false, message: 'MongoDB connection string (URI) is required' });
+    return;
+  }
+
+  try {
+    const success = await mongoManager.initConnection(uri.trim());
+    if (success) {
+      await mongoManager.syncAllData(db.getAllData());
+      const status = await mongoManager.getStatus(db.getCounts());
+      logAudit(req, 'CONNECT_MONGODB', 'Database', undefined, 'Connected and synchronized data with MongoDB cluster');
+      res.json({ success: true, message: 'Successfully connected and synced database with MongoDB cluster', data: status });
+    } else {
+      res.status(400).json({ success: false, message: 'Could not establish connection with provided MongoDB URI. Check credentials and network access.' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'MongoDB connection attempt failed', error: err.message });
+  }
+});
+
+router.post('/mongodb/sync', authenticate, requireRole(['admin']), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!mongoManager.getConnected()) {
+      res.status(400).json({ success: false, message: 'MongoDB is not currently connected to an external cluster. Running on local persistent engine.' });
+      return;
+    }
+    await mongoManager.syncAllData(db.getAllData());
+    const status = await mongoManager.getStatus(db.getCounts());
+    logAudit(req, 'SYNC_MONGODB', 'Database', undefined, 'Manually triggered full database synchronization to MongoDB');
+    res.json({ success: true, message: 'All collections successfully synced with MongoDB', data: status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'MongoDB sync failed', error: err.message });
+  }
 });
 
 // ----------------------------------------------------
@@ -1556,13 +1656,21 @@ router.get('/reports/export/:type', authenticate, (req: Request, res: Response):
   res.send(csv);
 });
 
-// Admin Demo Reset Endpoint
+// Admin Baseline Data Reset Endpoint
 router.post('/admin/reset-demo', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
   db.resetToSeeds();
   cache.flushAll();
-  logAudit(req, 'RESET_SYSTEM_DATA', 'Database', undefined, 'Admin reset entire system data to initial realistic seed baseline');
-  broadcastSocketEvent('system:reset', { message: 'Database reset to demo seed state' });
-  res.json({ success: true, message: 'System database reset to standard maritime demo seeds' });
+  logAudit(req, 'RESET_SYSTEM_DATA', 'Database', undefined, 'Admin reset entire system data to initial baseline');
+  broadcastSocketEvent('system:reset', { message: 'Database reset to operational baseline state' });
+  res.json({ success: true, message: 'System database reset to standard maritime operational baseline' });
+});
+
+// Admin Clear All Operational Data
+router.post('/admin/clear-all', authenticate, requireRole(['admin']), (req: AuthRequest, res: Response): void => {
+  db.clearOperationalData();
+  cache.flushAll();
+  broadcastSocketEvent('system:reset', { message: 'All operational records erased' });
+  res.json({ success: true, message: 'All operational records in user and admin views have been erased' });
 });
 
 export default router;

@@ -15,7 +15,9 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  Code2
+  Code2,
+  History,
+  Database
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 
@@ -103,19 +105,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...(isAdmin
       ? [
           {
+            id: 'history',
+            label: 'Histories & Audit',
+            icon: History,
+            badge: 'Admin'
+          },
+          {
             id: 'users',
             label: 'User Administration',
             icon: UserCog,
             badge: 'Admin'
+          },
+          {
+            id: 'api-docs',
+            label: 'REST API Docs',
+            icon: Code2,
+            badge: 'REST'
           }
         ]
       : []),
-    {
-      id: 'api-docs',
-      label: 'REST API Docs',
-      icon: Code2,
-      badge: 'REST'
-    },
     {
       id: 'settings',
       label: 'Settings',
@@ -192,6 +200,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom User Area & Logout */}
       <div className="p-3 border-t border-slate-800 space-y-2">
+        {!isCollapsed && (
+          <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-[10px]">
+            <div className="flex items-center space-x-1.5 text-emerald-300 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <Database className="w-3 h-3 text-emerald-400" />
+              <span>MongoDB Engine</span>
+            </div>
+            <span className="font-mono text-emerald-400">Connected</span>
+          </div>
+        )}
+
         <button
           onClick={() => {
             logout();

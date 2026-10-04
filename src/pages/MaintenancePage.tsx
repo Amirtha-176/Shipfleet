@@ -11,26 +11,35 @@ import {
   Filter,
   X,
   Trash2,
-  ShieldAlert
+  ShieldAlert,
+  Lock,
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { maintenanceService, vesselService } from '../services/api.ts';
-import { IMaintenance, IVessel, MaintenancePriority, MaintenanceType } from '../types/client.ts';
+import { maintenanceService, vesselService, userService } from '../services/api.ts';
+import { IMaintenance, IVessel, MaintenancePriority, MaintenanceType, IUser } from '../types/client.ts';
 import { useToast } from '../components/Toast.tsx';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 
 interface MaintenancePageProps {
   onNavigate: (page: string, param?: string) => void;
 }
 
 export const MaintenancePage: React.FC<MaintenancePageProps> = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isUser } = useAuth();
   const { showToast } = useToast();
 
   const [records, setRecords] = useState<IMaintenance[]>([]);
   const [vessels, setVessels] = useState<IVessel[]>([]);
+  const [users, setUsers] = useState<IUser[]>([]);
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [userFilter, setUserFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Delete modal
+  const [recordToDelete, setRecordToDelete] = useState<IMaintenance | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Schedule Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,15 +60,20 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = () => {
   const loadMaintenance = async () => {
     try {
       setIsLoading(true);
-      const [maintData, vesselsData] = await Promise.all([
+      const [maintData, vesselsData, usersData] = await Promise.all([
         maintenanceService.getAll({
           status: statusFilter !== 'All' ? statusFilter : undefined,
-          priority: priorityFilter !== 'All' ? priorityFilter : undefined
+          priority: priorityFilter !== 'All' ? priorityFilter : undefined,
+          ...(isAdmin && userFilter !== 'All' ? { userId: userFilter } as any : {})
         }),
-        vesselService.getAll()
+        vesselService.getAll(),
+        isAdmin ? userService.getAll().catch(() => []) : Promise.resolve([])
       ]);
       setRecords(maintData);
       setVessels(vesselsData);
+      if (usersData && usersData.length > 0) {
+        setUsers(usersData);
+      }
       if (vesselsData.length > 0 && !formData.vesselId) {
         setFormData((prev) => ({ ...prev, vesselId: vesselsData[0]._id }));
       }
@@ -72,7 +86,22 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = () => {
 
   useEffect(() => {
     loadMaintenance();
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, userFilter]);
+
+  const handleDeleteMaintenance = async () => {
+    if (!recordToDelete) return;
+    try {
+      setIsDeleting(true);
+      await maintenanceService.delete(recordToDelete._id);
+      showToast('success', 'Deleted', `Maintenance record removed.`);
+      setRecordToDelete(null);
+      loadMaintenance();
+    } catch (err: any) {
+      showToast('error', 'Delete Denied', err.response?.data?.message || 'Could not delete maintenance record.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,15 +158,13 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = () => {
           </p>
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg shadow-rose-900/40 transition-all flex items-center space-x-1.5 self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Schedule Maintenance</span>
-          </button>
-        )}
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg shadow-rose-900/40 transition-all flex items-center space-x-1.5 self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Schedule Maintenance</span>
+        </button>
       </div>
 
       {/* KPI Cards */}
@@ -185,83 +212,179 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = () => {
           </select>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <span>Priority:</span>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-          >
-            <option value="All">All Priorities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-2">
+            <span>Priority:</span>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          {isAdmin && users.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <User className="w-3.5 h-3.5 text-rose-400" />
+              <span>Created By:</span>
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+              >
+                <option value="All">All Users</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Work Orders List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {records.map((m) => {
-          const priorityBadge =
-            m.priority === 'Critical'
-              ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-              : m.priority === 'High'
-              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-              : 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      {/* Maintenance Work Orders Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        {records.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-xs">
+            No maintenance tasks found matching criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3.5 px-4">Order / Description</th>
+                  <th className="py-3.5 px-4">Vessel</th>
+                  <th className="py-3.5 px-4">Type &amp; Priority</th>
+                  <th className="py-3.5 px-4">Schedule Dates</th>
+                  <th className="py-3.5 px-4">Technician / Yard</th>
+                  <th className="py-3.5 px-4">Cost (USD)</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Scheduled By</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {records.map((m) => {
+                  const priorityBadge =
+                    m.priority === 'Critical'
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      : m.priority === 'High'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      : 'bg-blue-500/20 text-blue-300 border-blue-500/30';
 
-          return (
-            <div
-              key={m._id}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3 text-xs"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono text-cyan-400 font-bold">{m.maintenanceId}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${priorityBadge}`}>
-                      {m.priority} Priority
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
-                      {m.maintenanceType}
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-white text-sm mt-1">{m.description}</h4>
-                  <div className="text-blue-400 font-semibold mt-0.5">{m.vesselName}</div>
-                </div>
+                  return (
+                    <tr key={m._id} className="hover:bg-slate-800/50 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-cyan-400 font-bold text-xs">{m.maintenanceId}</div>
+                        <div className="font-semibold text-white mt-0.5">{m.description}</div>
+                        {m.notes && <div className="text-[10px] text-slate-400 italic mt-0.5 max-w-xs truncate">"{m.notes}"</div>}
+                      </td>
+                      <td className="py-3.5 px-4 font-semibold text-blue-400">
+                        {m.vesselName}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${priorityBadge}`}>
+                            {m.priority}
+                          </span>
+                          <span className="text-[10px] text-slate-300 font-medium">
+                            {m.maintenanceType}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-slate-200">{m.startDate}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">Exp: {m.expectedCompletion}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="text-slate-200 font-medium">{m.technician}</div>
+                        {m.partsUsed && m.partsUsed.length > 0 && (
+                          <div className="text-[10px] text-slate-400 truncate max-w-[120px]">
+                            {m.partsUsed.join(', ')}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-400">
+                        ${m.costUSD.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                            m.status === 'Completed'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : m.status === 'In Progress'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700'
+                          }`}
+                        >
+                          {m.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-medium text-slate-200">{m.createdByName || 'Standard User'}</div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate max-w-[130px]">{m.createdByEmail || 'user@shipfleet.com'}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {m.status !== 'Completed' ? (
+                            <button
+                              onClick={() => handleComplete(m)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 font-semibold flex items-center space-x-1 transition-all text-[11px]"
+                              title="Mark Task Completed"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Done</span>
+                            </button>
+                          ) : (
+                            <span className="text-emerald-400 font-semibold text-[10px] flex items-center space-x-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Certified</span>
+                            </span>
+                          )}
 
-                <div className="text-right">
-                  <div className="font-bold text-emerald-400 text-base">${m.costUSD.toLocaleString()}</div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
-                    {m.status}
-                  </span>
-                </div>
-              </div>
-
-              {/* Details box */}
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1 text-[11px] text-slate-400">
-                <div>Technician / Class: <strong className="text-slate-200">{m.technician}</strong></div>
-                <div>Schedule: {m.startDate} ➔ Expected {m.expectedCompletion}</div>
-                <div>Parts: <span className="text-slate-300">{m.partsUsed?.join(', ')}</span></div>
-                {m.notes && <div className="text-slate-400 italic mt-1">"{m.notes}"</div>}
-              </div>
-
-              {isAdmin && m.status !== 'Completed' && (
-                <div className="flex justify-end pt-2 border-t border-slate-800">
-                  <button
-                    onClick={() => handleComplete(m)}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 font-semibold flex items-center space-x-1.5 transition-all"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark Completed</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                          {isAdmin ? (
+                            <button
+                              onClick={() => setRecordToDelete(m)}
+                              className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors"
+                              title="Delete Maintenance Record (Admin Only)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 inline-flex items-center space-x-1 pl-1" title="Upload permanent: only admin can delete">
+                              <Lock className="w-3 h-3 text-slate-500" />
+                              <span>Protected</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* Confirm Delete Dialog (Admin Only) */}
+      <ConfirmDialog
+        isOpen={!!recordToDelete}
+        title="Delete Maintenance Record"
+        message={`Are you sure you want to permanently delete work order ${recordToDelete?.maintenanceId} for ${recordToDelete?.vesselName}?`}
+        confirmLabel="Delete Record"
+        onConfirm={handleDeleteMaintenance}
+        onCancel={() => setRecordToDelete(null)}
+        isLoading={isDeleting}
+      />
 
       {/* Schedule Maintenance Modal (Admin Only) */}
       {isModalOpen && (

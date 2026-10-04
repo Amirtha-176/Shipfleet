@@ -112,56 +112,70 @@ export const PortsPage: React.FC<PortsPageProps> = () => {
         </span>
       </div>
 
-      {/* Ports Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {ports.map((port) => (
-          <div
-            key={port._id}
-            className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3 hover:border-slate-700 transition-all text-xs"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="font-mono text-cyan-400 font-bold text-[11px]">{port.portCode}</span>
-                <h3 className="font-bold text-white text-base mt-0.5">{port.name}</h3>
-                <div className="text-slate-400 flex items-center space-x-1 mt-0.5">
-                  <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                  <span>{port.city ? `${port.city}, ` : ''}{port.country}</span>
-                </div>
-              </div>
-
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                  port.status === 'Open'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    : port.status === 'Congested'
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                    : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                }`}
-              >
-                {port.status}
-              </span>
-            </div>
-
-            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-1.5 text-[11px] text-slate-300">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Coordinates:</span>
-                <span className="font-mono text-cyan-300">{port.lat.toFixed(2)}°, {port.lng.toFixed(2)}°</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Annual Capacity:</span>
-                <span className="font-semibold text-white">{(port.capacityTEU / 1000000).toFixed(1)}M TEU</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Hours:</span>
-                <span className="text-slate-200">{port.operatingHours}</span>
-              </div>
-            </div>
-
-            <div className="text-[11px] text-slate-400 truncate">
-              Contact: <span className="text-slate-300">{port.contact}</span>
-            </div>
+      {/* Ports Data Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        {ports.length === 0 ? (
+          <div className="p-12 text-center text-slate-400 text-xs">
+            No ports found matching criteria.
           </div>
-        ))}
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3.5 px-4">Port / Code</th>
+                  <th className="py-3.5 px-4">Location</th>
+                  <th className="py-3.5 px-4">Coordinates</th>
+                  <th className="py-3.5 px-4">Annual Capacity</th>
+                  <th className="py-3.5 px-4">Operating Hours</th>
+                  <th className="py-3.5 px-4">Contact</th>
+                  <th className="py-3.5 px-4 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {ports.map((port) => (
+                  <tr key={port._id} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-white text-sm">{port.name}</div>
+                      <span className="font-mono text-cyan-400 font-bold text-[11px]">{port.portCode}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="text-slate-200 font-medium flex items-center space-x-1">
+                        <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                        <span>{port.city ? `${port.city}, ` : ''}{port.country}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-300">
+                      {port.lat.toFixed(2)}°, {port.lng.toFixed(2)}°
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-white">
+                      {(port.capacityTEU / 1000000).toFixed(1)}M TEU
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-300">
+                      {port.operatingHours}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-400 truncate max-w-xs">
+                      {port.contact}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-block ${
+                          port.status === 'Open'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : port.status === 'Congested'
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        }`}
+                      >
+                        {port.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add Port Modal */}

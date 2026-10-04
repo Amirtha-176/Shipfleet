@@ -11,28 +11,37 @@ import {
   Download,
   X,
   Trash2,
-  BarChart3
+  BarChart3,
+  Lock,
+  User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { fuelService, vesselService, voyageService, reportService } from '../services/api.ts';
-import { IFuelRecord, IVessel, IVoyage } from '../types/client.ts';
+import { fuelService, vesselService, voyageService, reportService, userService } from '../services/api.ts';
+import { IFuelRecord, IVessel, IVoyage, IUser } from '../types/client.ts';
 import { useToast } from '../components/Toast.tsx';
+import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 
 interface FuelPageProps {
   onNavigate: (page: string, param?: string) => void;
 }
 
 export const FuelPage: React.FC<FuelPageProps> = () => {
-  const { isAdmin, isOperator } = useAuth();
+  const { isAdmin, isOperator, isUser } = useAuth();
   const { showToast } = useToast();
 
   const [fuelRecords, setFuelRecords] = useState<IFuelRecord[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [vessels, setVessels] = useState<IVessel[]>([]);
   const [voyages, setVoyages] = useState<IVoyage[]>([]);
+  const [users, setUsers] = useState<IUser[]>([]);
   const [vesselFilter, setVesselFilter] = useState('All');
   const [fuelTypeFilter, setFuelTypeFilter] = useState('All');
+  const [userFilter, setUserFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Delete modal
+  const [recordToDelete, setRecordToDelete] = useState<IFuelRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Log Fuel Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,20 +63,25 @@ export const FuelPage: React.FC<FuelPageProps> = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [records, analyticsData, vesselsData, voyagesData] = await Promise.all([
+      const [records, analyticsData, vesselsData, voyagesData, usersData] = await Promise.all([
         fuelService.getAll({
           vesselId: vesselFilter !== 'All' ? vesselFilter : undefined,
-          fuelType: fuelTypeFilter !== 'All' ? fuelTypeFilter : undefined
+          fuelType: fuelTypeFilter !== 'All' ? fuelTypeFilter : undefined,
+          ...(isAdmin && userFilter !== 'All' ? { userId: userFilter } as any : {})
         }),
         fuelService.getAnalytics(),
         vesselService.getAll(),
-        voyageService.getAll()
+        voyageService.getAll(),
+        isAdmin ? userService.getAll().catch(() => []) : Promise.resolve([])
       ]);
 
       setFuelRecords(records);
       setAnalytics(analyticsData);
       setVessels(vesselsData);
       setVoyages(voyagesData);
+      if (usersData && usersData.length > 0) {
+        setUsers(usersData);
+      }
       if (vesselsData.length > 0 && !formData.vesselId) {
         setFormData((prev) => ({ ...prev, vesselId: vesselsData[0]._id }));
       }
@@ -80,7 +94,22 @@ export const FuelPage: React.FC<FuelPageProps> = () => {
 
   useEffect(() => {
     loadData();
-  }, [vesselFilter, fuelTypeFilter]);
+  }, [vesselFilter, fuelTypeFilter, userFilter]);
+
+  const handleDeleteRecord = async () => {
+    if (!recordToDelete) return;
+    try {
+      setIsDeleting(true);
+      await fuelService.delete(recordToDelete._id);
+      showToast('success', 'Deleted', `Fuel record removed.`);
+      setRecordToDelete(null);
+      loadData();
+    } catch (err: any) {
+      showToast('error', 'Delete Denied', err.response?.data?.message || 'Could not delete fuel record.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Dynamic automatic calculation of Total Cost & Efficiency
   const calculatedTotalCost = formData.quantityMT * formData.unitPriceUSD;
@@ -234,6 +263,21 @@ export const FuelPage: React.FC<FuelPageProps> = () => {
               <option value="MGO">MGO</option>
               <option value="LNG">LNG</option>
             </select>
+
+            {isAdmin && users.length > 0 && (
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+              >
+                <option value="All">All Users</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -249,6 +293,8 @@ export const FuelPage: React.FC<FuelPageProps> = () => {
                 <th className="py-3 px-4">Total Cost</th>
                 <th className="py-3 px-4">Port / Bunkerer</th>
                 <th className="py-3 px-4">Distance / Efficiency</th>
+                <th className="py-3 px-4">Logged By</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -265,12 +311,43 @@ export const FuelPage: React.FC<FuelPageProps> = () => {
                     <div className="font-mono text-cyan-300 font-bold">{r.fuelEfficiencyNMPerMT} NM/MT</div>
                     <div className="text-[10px] text-slate-500">{r.distanceTravelledNM} NM covered</div>
                   </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-medium text-slate-200">{r.createdByName || 'Standard User'}</div>
+                    <div className="text-[10px] text-slate-500 font-mono">{r.createdByEmail || 'user@shipfleet.com'}</div>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    {isAdmin ? (
+                      <button
+                        onClick={() => setRecordToDelete(r)}
+                        className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors"
+                        title="Delete Fuel Record (Admin Only)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 inline-flex items-center space-x-1" title="Upload permanent: only admin can delete">
+                        <Lock className="w-3 h-3 text-slate-500" />
+                        <span>Protected</span>
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Confirm Delete Dialog (Admin Only) */}
+      <ConfirmDialog
+        isOpen={!!recordToDelete}
+        title="Delete Fuel Bunkering Record"
+        message={`Are you sure you want to permanently delete the bunkering entry of ${recordToDelete?.quantityMT} MT ${recordToDelete?.fuelType} for ${recordToDelete?.vesselName}?`}
+        confirmLabel="Delete Record"
+        onConfirm={handleDeleteRecord}
+        onCancel={() => setRecordToDelete(null)}
+        isLoading={isDeleting}
+      />
 
       {/* Log Fuel Modal (Operator & Admin) */}
       {isModalOpen && (

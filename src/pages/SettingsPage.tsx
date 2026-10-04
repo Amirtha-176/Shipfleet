@@ -55,18 +55,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }
   };
 
-  const handleResetDemo = async () => {
-    if (!window.confirm('Reset all vessels, voyages, cargo, and fuel records to the standard demo baseline?')) {
+  const handleResetData = async () => {
+    if (!window.confirm('Reset all operational data to the clean baseline database state?')) {
       return;
     }
 
     setIsResettingData(true);
     try {
       await systemService.resetDemoData();
-      showToast('success', 'Database Reset', 'Restored realistic maritime demo seed dataset.');
+      showToast('success', 'Database Reset', 'Restored clean maritime operational baseline.');
       refreshUser();
     } catch (err) {
-      showToast('error', 'Reset Failed', 'Failed to reset demo database.');
+      showToast('error', 'Reset Failed', 'Failed to reset operational database.');
     } finally {
       setIsResettingData(false);
     }
@@ -207,12 +207,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             {isAdmin && (
               <div className="pt-3 border-t border-slate-800">
                 <button
-                  onClick={handleResetDemo}
+                  onClick={handleResetData}
                   disabled={isResettingData}
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white font-semibold transition-all flex items-center justify-center space-x-2"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isResettingData ? 'animate-spin' : ''}`} />
-                  <span>Restore Demo Seed Database</span>
+                  <span>Restore Operational Baseline Data</span>
                 </button>
               </div>
             )}

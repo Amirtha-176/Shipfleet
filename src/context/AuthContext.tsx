@@ -12,7 +12,6 @@ interface AuthContextType {
   isViewer: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string; role?: UserRole }>;
   logout: () => Promise<void>;
-  switchUserRoleDemo: (role: 'admin' | 'user') => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -81,17 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Quick switcher for demo evaluation (2 primary logins: Admin and User)
-  const switchUserRoleDemo = async (role: 'admin' | 'user') => {
-    let email = 'user@shipfleet.com';
-    let password = 'User@123';
-    if (role === 'admin') {
-      email = 'admin@shipfleet.com';
-      password = 'Admin@123';
-    }
-    await login(email, password);
-  };
-
   const isAdmin = user?.role === 'admin';
   const isUser = user?.role === 'user' || user?.role === 'operator' || user?.role === 'viewer';
   const isOperator = isUser; // User has full operator operational capabilities
@@ -109,7 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isViewer,
         login,
         logout,
-        switchUserRoleDemo,
         refreshUser
       }}
     >

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 interface LandingPageProps {
-  onOpenLogin: (role?: 'admin' | 'user') => void;
+  onOpenLogin: (role?: 'admin' | 'user', tab?: 'signin' | 'signup') => void;
   onExplorePublic?: () => void;
 }
 
@@ -41,19 +41,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenLogin }) => {
               </div>
               <div>
                 <span className="font-black text-xl tracking-tight text-white flex items-center space-x-2">
-                  <span>ShipFleet</span>
-                  <span className="text-cyan-400">Management System</span>
+                  <span>NavisFleet</span>
+                  <span className="text-cyan-400">Maritime OS</span>
                 </span>
                 <span className="block text-xs text-slate-400 font-medium">
-                  FleetOps Maritime Control & Live Voyage Tracking
+                  Enterprise Shipping Fleet &amp; Ocean Logistics Management
                 </span>
               </div>
             </div>
 
-            {/* Right: Only 2 Login Buttons */}
+            {/* Right: Authentication Buttons */}
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => onOpenLogin('user')}
+                onClick={() => onOpenLogin('user', 'signin')}
                 className="px-4 py-2.5 rounded-xl border border-slate-700 hover:border-blue-500 bg-slate-900/80 hover:bg-slate-850 text-slate-200 text-xs sm:text-sm font-semibold transition-all flex items-center space-x-2 hover:shadow-lg"
               >
                 <Eye className="w-4 h-4 text-cyan-400" />
@@ -61,11 +61,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenLogin }) => {
               </button>
 
               <button
-                onClick={() => onOpenLogin('admin')}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-900/40 transition-all flex items-center space-x-2 hover:scale-[1.02]"
+                onClick={() => onOpenLogin('admin', 'signin')}
+                className="px-4 py-2.5 rounded-xl border border-rose-500/40 hover:border-rose-500 bg-rose-600/10 hover:bg-rose-600/20 text-rose-300 text-xs sm:text-sm font-semibold transition-all flex items-center space-x-2 hover:shadow-lg"
               >
-                <KeyRound className="w-4 h-4" />
+                <KeyRound className="w-4 h-4 text-rose-400" />
                 <span>Admin Login</span>
+              </button>
+
+              <button
+                onClick={() => onOpenLogin('user', 'signup')}
+                className="hidden sm:flex px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-900/40 transition-all items-center space-x-2 hover:scale-[1.02]"
+              >
+                <span>Sign Up</span>
               </button>
             </div>
           </div>
@@ -99,54 +106,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onOpenLogin }) => {
           {/* Action CTAs: Exactly 2 Roles */}
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
-              onClick={() => onOpenLogin('admin')}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-xl shadow-rose-900/40 transition-all flex items-center justify-center space-x-2"
+              onClick={() => onOpenLogin('user', 'signup')}
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-xl shadow-emerald-900/40 transition-all flex items-center justify-center space-x-2"
             >
-              <KeyRound className="w-4 h-4" />
-              <span>Log In as Admin</span>
+              <span>Create User Account</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onOpenLogin('user')}
+              onClick={() => onOpenLogin('user', 'signin')}
               className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xl shadow-blue-900/40 transition-all flex items-center justify-center space-x-2"
             >
               <Eye className="w-4 h-4 text-cyan-200" />
-              <span>Log In as User</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>User Sign In</span>
             </button>
-          </div>
-
-          {/* Demo Account Quick Selector Card (2 Logins: Admin & User) */}
-          <div className="mt-8 p-4 bg-slate-900/70 border border-slate-800 rounded-2xl max-w-2xl mx-auto text-left backdrop-blur-md">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-              <span>Demo Quick-Fill Credentials (Seeded into MongoDB)</span>
-              <span className="text-emerald-400">2 Logins Ready</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={() => onOpenLogin('admin')}
-                className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-rose-500/50 text-left transition-all group"
-              >
-                <div className="font-bold text-xs text-rose-400 group-hover:text-rose-300 flex items-center justify-between">
-                  <span>Admin Account</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">Directorate</span>
-                </div>
-                <div className="text-[11px] text-slate-200 font-mono mt-1">admin@shipfleet.com</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Password: Admin@123 (Full Fleet &amp; User Control)</div>
-              </button>
-
-              <button
-                onClick={() => onOpenLogin('user')}
-                className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 text-left transition-all group"
-              >
-                <div className="font-bold text-xs text-cyan-400 group-hover:text-cyan-300 flex items-center justify-between">
-                  <span>User Account</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30">Operations &amp; Monitor</span>
-                </div>
-                <div className="text-[11px] text-slate-200 font-mono mt-1">user@shipfleet.com</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Password: User@123 (Voyages, Cargo, Fuel, Telemetry)</div>
-              </button>
-            </div>
+            <button
+              onClick={() => onOpenLogin('admin', 'signin')}
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-rose-500/40 hover:border-rose-500 text-rose-300 font-bold text-sm shadow-xl transition-all flex items-center justify-center space-x-2"
+            >
+              <KeyRound className="w-4 h-4 text-rose-400" />
+              <span>Admin Sign In</span>
+            </button>
           </div>
         </div>
       </section>

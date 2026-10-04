@@ -25,6 +25,7 @@ import {
   seedAlerts,
   seedAuditLogs
 } from './seedData.ts';
+import { mongoManager } from './mongo.ts';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
@@ -52,6 +53,13 @@ class StorageEngine {
 
   constructor() {
     this.data = this.loadData();
+    this.onMutation((collection, action, doc) => {
+      mongoManager.syncDoc(collection, action, doc).catch(() => {});
+    });
+    // Attempt full sync if MongoDB is already connected
+    if (mongoManager.getConnected()) {
+      mongoManager.syncAllData(this.data).catch(() => {});
+    }
   }
 
   private loadData(): IDatabaseSchema {
@@ -80,39 +88,16 @@ class StorageEngine {
               mutated = true;
             }
           }
-          // Ensure createdBy ownership on existing records
-          parsed.voyages?.forEach((v) => {
-            if (!v.createdBy) {
-              v.createdBy = 'usr_user_001';
-              v.createdByName = 'Elena Rostova (User)';
-              v.createdByEmail = 'user@shipfleet.com';
-              mutated = true;
-            }
-          });
-          parsed.cargo?.forEach((c) => {
-            if (!c.createdBy) {
-              c.createdBy = 'usr_user_001';
-              c.createdByName = 'Elena Rostova (User)';
-              c.createdByEmail = 'user@shipfleet.com';
-              mutated = true;
-            }
-          });
-          parsed.fuelRecords?.forEach((f) => {
-            if (!f.createdBy) {
-              f.createdBy = 'usr_user_001';
-              f.createdByName = 'Elena Rostova (User)';
-              f.createdByEmail = 'user@shipfleet.com';
-              mutated = true;
-            }
-          });
-          parsed.maintenance?.forEach((m) => {
-            if (!m.createdBy) {
-              m.createdBy = 'usr_user_001';
-              m.createdByName = 'Elena Rostova (User)';
-              m.createdByEmail = 'user@shipfleet.com';
-              mutated = true;
-            }
-          });
+          // Wipe previous seed operational records to start clean slate for user and admin
+          if (parsed.voyages?.some((v) => v._id === 'vyg_001') || parsed.cargo?.some((c) => c._id === 'crg_001') || parsed.fuelRecords?.some((f) => f._id === 'fuel_001')) {
+            parsed.voyages = [];
+            parsed.cargo = [];
+            parsed.fuelRecords = [];
+            parsed.maintenance = [];
+            parsed.alerts = [];
+            parsed.auditLogs = [];
+            mutated = true;
+          }
 
           if (mutated) {
             this.saveData(parsed);
@@ -124,18 +109,18 @@ class StorageEngine {
       console.error('Failed to load existing database file, re-initializing seeds:', err);
     }
 
-    // Default Seed Data
+    // Clean Slate Operational Data
     const initialData: IDatabaseSchema = {
       users: [...seedUsers],
       vessels: [...seedVessels],
-      voyages: [...seedVoyages],
-      cargo: [...seedCargo],
-      fuelRecords: [...seedFuelRecords],
-      maintenance: [...seedMaintenance],
+      voyages: [],
+      cargo: [],
+      fuelRecords: [],
+      maintenance: [],
       ports: [...seedPorts],
       crew: [...seedCrew],
-      alerts: [...seedAlerts],
-      auditLogs: [...seedAuditLogs]
+      alerts: [],
+      auditLogs: []
     };
 
     this.saveData(initialData);
@@ -263,21 +248,51 @@ class StorageEngine {
     return this.find(collectionName, predicate).length;
   }
 
+  public getCounts(): Record<string, number> {
+    return {
+      users: this.data.users?.length || 0,
+      vessels: this.data.vessels?.length || 0,
+      voyages: this.data.voyages?.length || 0,
+      cargo: this.data.cargo?.length || 0,
+      fuelRecords: this.data.fuelRecords?.length || 0,
+      maintenance: this.data.maintenance?.length || 0,
+      ports: this.data.ports?.length || 0,
+      crew: this.data.crew?.length || 0,
+      alerts: this.data.alerts?.length || 0,
+      auditLogs: this.data.auditLogs?.length || 0
+    };
+  }
+
+  public getAllData(): IDatabaseSchema {
+    return this.data;
+  }
+
   public resetToSeeds(): void {
     this.data = {
       users: [...seedUsers],
       vessels: [...seedVessels],
-      voyages: [...seedVoyages],
-      cargo: [...seedCargo],
-      fuelRecords: [...seedFuelRecords],
-      maintenance: [...seedMaintenance],
+      voyages: [],
+      cargo: [],
+      fuelRecords: [],
+      maintenance: [],
       ports: [...seedPorts],
       crew: [...seedCrew],
-      alerts: [...seedAlerts],
-      auditLogs: [...seedAuditLogs]
+      alerts: [],
+      auditLogs: []
     };
     this.saveData();
     this.notify('users', 'reset', null);
+  }
+
+  public clearOperationalData(): void {
+    this.data.voyages = [];
+    this.data.cargo = [];
+    this.data.fuelRecords = [];
+    this.data.maintenance = [];
+    this.data.alerts = [];
+    this.data.auditLogs = [];
+    this.saveData();
+    this.notify('voyages', 'reset', null);
   }
 }
 
